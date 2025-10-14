@@ -13,6 +13,7 @@ import os
 import subprocess
 import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -57,6 +58,7 @@ class SSHUpdateManager:
         self.server_rows: Dict[str, ServerRow] = {}
         self.current_thread: threading.Thread | None = None
         self.last_saved_file: Optional[Path] = None
+        self.max_parallel_workers = 10
 
         self._build_ui()
 
@@ -120,11 +122,15 @@ class SSHUpdateManager:
         self.log_output.pack(fill=BOTH, expand=True, padx=10, pady=(0, 10))
 
     def log(self, message: str) -> None:
-        """Append a message to the log output box."""
-        self.log_output.configure(state="normal")
-        self.log_output.insert(END, message + "\n")
-        self.log_output.configure(state="disabled")
-        self.log_output.see(END)
+        """Append a message to the log output box in the UI thread."""
+
+        def callback() -> None:
+            self.log_output.configure(state="normal")
+            self.log_output.insert(END, message + "\n")
+            self.log_output.configure(state="disabled")
+            self.log_output.see(END)
+
+        self.root.after(0, callback)
 
     def run_command(self) -> None:
         """Validate input and start command execution in a thread."""
@@ -188,7 +194,7 @@ class SSHUpdateManager:
         self.overall_progress["maximum"] = len(servers)
 
     def _execute_commands(self, servers: List[str], username: str, password: str, command: str) -> None:
-        """Execute SSH command sequentially and record results."""
+        """Execute SSH command with bounded parallelism and record results."""
         wb = Workbook()
         ws = wb.active
         ws.title = "Update Results"
@@ -197,12 +203,15 @@ class SSHUpdateManager:
         output_dir = self._ensure_output_dir()
         self.log(f"Saving results to {output_dir}")
 
-        for index, host in enumerate(servers, start=1):
+        results: Dict[str, tuple[str, str]] = {}
+
+        def worker(host: str) -> tuple[str, str, str]:
             self._update_server_row(host, 5, "Connecting...", "")
             self.log(f"Connecting to {host}...")
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
             try:
-                client = paramiko.SSHClient()
-                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 client.connect(hostname=host, username=username, password=password)
 
                 self._update_server_row(host, 35, "Executing command", "")
@@ -226,16 +235,32 @@ class SSHUpdateManager:
                     result_text = "Unknown response"
                     error_text = error.strip() or "No output"
 
-                ws.append([host, result_text, error_text])
                 self._update_server_row(host, 100, "Completed", result_text)
                 self.log(f"Finished with {host}: {result_text}")
-                client.close()
+                return host, result_text, error_text
             except Exception as exc:  # pragma: no cover - user feedback only
-                ws.append([host, "Error", str(exc)])
-                self._update_server_row(host, 100, "Error", str(exc))
+                error_message = str(exc)
+                self._update_server_row(host, 100, "Error", error_message)
                 self.log(f"Error on {host}: {exc}")
+                return host, "Error", error_message
+            finally:
+                try:
+                    client.close()
+                except Exception:
+                    pass
 
-            self._update_overall_progress(index)
+        completed = 0
+        with ThreadPoolExecutor(max_workers=self.max_parallel_workers) as executor:
+            future_to_host = {executor.submit(worker, host): host for host in servers}
+            for future in as_completed(future_to_host):
+                host, result_text, error_text = future.result()
+                results[host] = (result_text, error_text)
+                completed += 1
+                self._update_overall_progress(completed)
+
+        for host in servers:
+            result_text, error_text = results.get(host, ("No result", "No result"))
+            ws.append([host, result_text, error_text])
 
         file_path = self._save_workbook(wb, output_dir)
         self.log(f"Results saved to {file_path}")
