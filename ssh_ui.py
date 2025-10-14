@@ -9,14 +9,17 @@ well as overall.
 from __future__ import annotations
 
 import datetime
+import os
+import subprocess
+import sys
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import paramiko
 from openpyxl import Workbook
-from tkinter import END, BOTH, LEFT, RIGHT, StringVar, Tk, messagebox
+from tkinter import END, BOTH, LEFT, RIGHT, StringVar, Tk, filedialog, messagebox
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 
@@ -49,9 +52,11 @@ class SSHUpdateManager:
         self.username_var = StringVar()
         self.password_var = StringVar()
         self.command_var = StringVar(value="sudo yum update -y")
+        self.output_dir_var = StringVar(value=self._default_output_dir())
 
         self.server_rows: Dict[str, ServerRow] = {}
         self.current_thread: threading.Thread | None = None
+        self.last_saved_file: Optional[Path] = None
 
         self._build_ui()
 
@@ -78,6 +83,23 @@ class SSHUpdateManager:
 
         self.server_text = ScrolledText(server_frame, height=8)
         self.server_text.pack(fill=BOTH, expand=True, padx=5, pady=5)
+
+        output_frame = ttk.LabelFrame(self.root, text="Results output location")
+        output_frame.pack(fill=BOTH, padx=10, pady=5)
+
+        ttk.Label(output_frame, text="Directory:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        ttk.Entry(output_frame, textvariable=self.output_dir_var).grid(row=0, column=1, sticky="we", padx=5, pady=5)
+        ttk.Button(output_frame, text="Browse...", command=self.browse_output_dir).grid(row=0, column=2, sticky="e", padx=5, pady=5)
+
+        self.open_results_button = ttk.Button(
+            output_frame,
+            text="Open last results",
+            command=self.open_last_results,
+            state="disabled",
+        )
+        self.open_results_button.grid(row=1, column=0, columnspan=3, sticky="w", padx=5, pady=(0, 5))
+
+        output_frame.columnconfigure(1, weight=1)
 
         controls_frame = ttk.Frame(self.root)
         controls_frame.pack(fill=BOTH, padx=10, pady=5)
@@ -122,6 +144,7 @@ class SSHUpdateManager:
         self.log("Starting command execution...")
         self.status_message.configure(text="Running")
         self.run_button.configure(state="disabled")
+        self.open_results_button.configure(state="disabled")
         self._prepare_server_rows(servers)
 
         self.current_thread = threading.Thread(
@@ -171,6 +194,9 @@ class SSHUpdateManager:
         ws.title = "Update Results"
         ws.append(["Server", "Result", "Error"])
 
+        output_dir = self._ensure_output_dir()
+        self.log(f"Saving results to {output_dir}")
+
         for index, host in enumerate(servers, start=1):
             self._update_server_row(host, 5, "Connecting...", "")
             self.log(f"Connecting to {host}...")
@@ -211,8 +237,9 @@ class SSHUpdateManager:
 
             self._update_overall_progress(index)
 
-        file_path = self._save_workbook(wb)
+        file_path = self._save_workbook(wb, output_dir)
         self.log(f"Results saved to {file_path}")
+        self._set_last_saved_file(file_path)
         self._on_completion()
 
     def _update_server_row(self, host: str, progress: int, status: str, detail: str) -> None:
@@ -233,11 +260,60 @@ class SSHUpdateManager:
 
         self.root.after(0, callback)
 
-    def _save_workbook(self, workbook: Workbook) -> Path:
+    def _save_workbook(self, workbook: Workbook, output_dir: Path) -> Path:
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        file_path = Path.cwd() / f"ssh_command_results_{timestamp}.xlsx"
+        file_path = output_dir / f"ssh_command_results_{timestamp}.xlsx"
         workbook.save(file_path)
         return file_path
+
+    def _default_output_dir(self) -> str:
+        downloads = Path.home() / "Downloads"
+        if downloads.exists():
+            return str(downloads)
+        return str(Path.cwd())
+
+    def browse_output_dir(self) -> None:
+        selected = filedialog.askdirectory(initialdir=self.output_dir_var.get() or self._default_output_dir())
+        if selected:
+            self.output_dir_var.set(selected)
+
+    def _ensure_output_dir(self) -> Path:
+        try:
+            output_dir = Path(self.output_dir_var.get()).expanduser()
+        except Exception:  # pragma: no cover - fallback for invalid paths
+            output_dir = Path(self._default_output_dir())
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return output_dir
+
+    def _set_last_saved_file(self, file_path: Path) -> None:
+        def callback() -> None:
+            self.last_saved_file = file_path
+            self.open_results_button.configure(
+                text=f"Open last results ({file_path.name})",
+                state="normal",
+            )
+
+        self.root.after(0, callback)
+
+    def open_last_results(self) -> None:
+        if not self.last_saved_file:
+            messagebox.showinfo("No file", "No results file has been generated yet.")
+            return
+
+        file_path = self.last_saved_file
+        if not file_path.exists():
+            messagebox.showwarning("File missing", f"The file {file_path} could not be found.")
+            return
+
+        try:
+            if sys.platform.startswith("darwin"):
+                subprocess.run(["open", str(file_path)], check=False)
+            elif os.name == "nt":
+                os.startfile(str(file_path))  # type: ignore[attr-defined]
+            else:
+                subprocess.run(["xdg-open", str(file_path)], check=False)
+        except Exception as exc:  # pragma: no cover - OS dependent
+            messagebox.showerror("Unable to open file", f"Could not open the results file: {exc}")
 
 
 def main() -> None:
