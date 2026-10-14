@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weather widget</title>
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <style>
+    :root { --fg: #fff; --muted: rgba(255,255,255,.85); }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: #1b4f9c; }
+    a { color: inherit; text-decoration: none; }
+    .w { display: grid; gap: 8px; height: 100%; padding: 14px; background: linear-gradient(160deg, var(--a, #1b4f9c), var(--b, #3a7bd5)); }
+    .row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+    .name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .temp { font-size: 40px; font-weight: 300; line-height: 1; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .hours, .days { display: flex; justify-content: space-between; gap: 4px; }
+    .hours div, .days div { display: grid; justify-items: center; font-size: 12px; gap: 2px; }
+    .days { flex-direction: column; }
+    .days div { display: grid; grid-template-columns: 1fr 28px 40px 40px; justify-items: start; align-items: center; }
+    .msg { display: grid; place-items: center; height: 100%; text-align: center; padding: 12px; }
+    /* sizes */
+    .small { max-width: 170px; max-height: 170px; }
+    .medium { max-width: 360px; max-height: 170px; }
+    .large { max-width: 360px; max-height: 380px; }
+  </style>
+  <script type="module" src="js/widget.js"></script>
+</head>
+<body>
+  <!--
+    Embeddable widget. Usage:
+      <iframe src="widget.html?lat=30.04&lon=31.24&name=Cairo&size=medium" width="360" height="170"></iframe>
+    size = small | medium | large. Without lat/lon it uses the first saved location.
+  -->
+  <a id="root" class="w medium" href="./" target="_top"><div class="msg">…</div></a>
+</body>
+</html>

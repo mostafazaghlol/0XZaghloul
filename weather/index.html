@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Weather</title>
+  <meta name="description" content="Current conditions, hourly and 10-day forecasts, radar, air quality and severe-weather alerts.">
+  <meta name="theme-color" content="#1e3a6e">
+  <meta name="color-scheme" content="light dark">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="preconnect" href="https://api.open-meteo.com" crossorigin>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body class="bg-cloudy-day">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="sky" aria-hidden="true"><div class="particles"></div></div>
+
+  <header class="topbar">
+    <button class="icon-btn" id="btn-locations" type="button" data-i18n-attr="aria-label:locations;title:locations" aria-label="Locations" aria-haspopup="dialog"></button>
+    <form class="search" id="search-form" role="search" autocomplete="off">
+      <label class="visually-hidden" for="search-input" data-i18n="searchLabel">Search for a location</label>
+      <span class="search-icon" aria-hidden="true"></span>
+      <input id="search-input" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false"
+             aria-controls="search-results" enterkeyhint="search" spellcheck="false"
+             data-i18n-attr="placeholder:search" placeholder="Search city, ZIP/postal code or lat, lon">
+      <ul id="search-results" class="search-results" role="listbox" hidden></ul>
+    </form>
+    <button class="icon-btn" id="btn-gps" type="button" data-i18n-attr="aria-label:useMyLocation;title:useMyLocation" aria-label="Use my location"></button>
+    <button class="icon-btn" id="btn-settings" type="button" data-i18n-attr="aria-label:settings;title:settings" aria-label="Settings" aria-haspopup="dialog"></button>
+  </header>
+
+  <div class="ptr" id="ptr" aria-hidden="true"><span class="ptr-spinner"></span><span class="ptr-text"></span></div>
+
+  <div class="banners">
+    <div class="banner banner-info" id="status-banner" role="status" hidden></div>
+    <div id="alerts" class="alerts" aria-live="polite"></div>
+    <div class="banner banner-rain" id="rain-banner" role="status" hidden></div>
+  </div>
+
+  <main id="main" tabindex="-1">
+    <section class="state state-loading" id="state-loading" aria-busy="true">
+      <div class="skeleton skeleton-hero"></div>
+      <div class="skeleton skeleton-row"></div>
+      <div class="skeleton skeleton-card"></div>
+      <p class="visually-hidden" data-i18n="loading">Loading weather…</p>
+    </section>
+
+    <section class="state state-empty card" id="state-empty" hidden>
+      <div class="empty-art" aria-hidden="true"></div>
+      <h1 data-i18n="welcomeTitle">Find your weather</h1>
+      <p id="empty-message" data-i18n="welcomeBody">Use your current location or search for any city, postal code or coordinates.</p>
+      <div class="actions">
+        <button class="btn btn-primary" type="button" id="empty-gps" data-i18n="useMyLocation">Use my location</button>
+        <button class="btn" type="button" id="empty-search" data-i18n="searchLabel">Search for a location</button>
+      </div>
+    </section>
+
+    <section class="state state-error card" id="state-error" role="alert" hidden>
+      <h1 data-i18n="errorTitle">Couldn’t load the weather</h1>
+      <p id="error-message"></p>
+      <button class="btn btn-primary" type="button" id="btn-retry" data-i18n="retry">Try again</button>
+    </section>
+
+    <div id="weather" hidden>
+      <section class="hero" id="hero" aria-roledescription="carousel" aria-labelledby="place-name">
+        <div class="hero-top">
+          <div>
+            <h1 class="place" id="place-name"></h1>
+            <p class="place-sub" id="place-sub"></p>
+          </div>
+          <button class="icon-btn fav-btn" id="btn-fav" type="button" aria-pressed="false"></button>
+        </div>
+        <div class="hero-main">
+          <div class="hero-icon" id="hero-icon"></div>
+          <div>
+            <p class="temp" id="hero-temp"></p>
+            <p class="cond" id="hero-cond"></p>
+          </div>
+        </div>
+        <p class="hero-feels"><span id="hero-feels"></span> · <span id="hero-hilo"></span></p>
+        <ul class="quick-stats" id="quick-stats"></ul>
+        <div class="pager" id="pager" role="tablist"></div>
+        <div class="hero-foot">
+          <p class="updated" id="updated"></p>
+          <div class="hero-actions">
+            <button class="icon-btn small" id="btn-refresh" type="button" data-i18n-attr="aria-label:refresh;title:refresh" aria-label="Refresh"></button>
+            <button class="icon-btn small" id="btn-share" type="button" data-i18n-attr="aria-label:share;title:share" aria-label="Share"></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-hourly">
+        <h2 id="h-hourly" data-i18n="hourly">Hourly forecast</h2>
+        <ol class="hourly" id="hourly" tabindex="0"></ol>
+      </section>
+
+      <section class="card" aria-labelledby="h-daily">
+        <h2 id="h-daily"></h2>
+        <ol class="daily" id="daily"></ol>
+      </section>
+
+      <section class="card" aria-labelledby="h-charts">
+        <div class="card-head">
+          <h2 id="h-charts" data-i18n="charts">Trends</h2>
+          <div class="seg" role="group" aria-labelledby="h-charts">
+            <button type="button" data-chart="temp" aria-pressed="true" data-i18n="chartTemp">Temperature</button>
+            <button type="button" data-chart="precip" aria-pressed="false" data-i18n="chartPrecip">Precipitation</button>
+          </div>
+        </div>
+        <div class="chart-wrap" id="chart" tabindex="0"></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-details">
+        <h2 id="h-details" data-i18n="details">Details</h2>
+        <ul class="tiles" id="details"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="h-sun">
+        <h2 id="h-sun" data-i18n="sunMoon">Sun &amp; moon</h2>
+        <div class="sun-moon">
+          <div class="sun" id="sun"></div>
+          <div class="moon" id="moon"></div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-aqi">
+        <h2 id="h-aqi" data-i18n="airQuality">Air quality</h2>
+        <div id="aqi"></div>
+        <h3 data-i18n="pollen">Pollen</h3>
+        <div id="pollen"></div>
+      </section>
+
+      <section class="card map-card" aria-labelledby="h-map">
+        <h2 id="h-map" data-i18n="map">Radar &amp; map</h2>
+        <button class="btn" type="button" id="btn-map" data-i18n="showMap">Show map</button>
+        <div class="map" id="map" hidden>
+          <div class="seg map-layers" role="group" aria-labelledby="h-map">
+            <button type="button" data-layer="radar" aria-pressed="true" data-i18n="layerRadar">Radar</button>
+            <button type="button" data-layer="temp" aria-pressed="false" data-i18n="layerTemp">Temperature</button>
+            <button type="button" data-layer="wind" aria-pressed="false" data-i18n="layerWind">Wind</button>
+            <button type="button" data-layer="clouds" aria-pressed="false" data-i18n="layerClouds">Clouds</button>
+          </div>
+          <div class="map-canvas" role="application" data-i18n-attr="aria-label:map"></div>
+          <p class="map-status" role="status" hidden></p>
+          <div class="map-timeline">
+            <button class="btn small" type="button" data-map-play aria-pressed="false"><span data-i18n="play">Play</span></button>
+            <input class="map-slider" type="range" min="0" max="0" value="0" data-i18n-attr="aria-label:layerRadar">
+            <span class="map-frame-time"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p><span data-i18n="dataBy">Weather data by</span>
+      <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a>,
+      <a href="https://www.weather.gov/" rel="noopener">NWS</a> (alerts),
+      <a href="https://www.rainviewer.com/" rel="noopener">RainViewer</a> (radar).
+      · <a id="widget-link" href="widget.html" data-i18n="widget">Widget</a>
+      <button class="link-btn" type="button" id="btn-install" hidden data-i18n="install">Install app</button>
+    </p>
+  </footer>
+
+  <!-- Saved locations -->
+  <dialog id="dlg-locations" class="sheet" aria-labelledby="dlg-locations-title">
+    <div class="sheet-head">
+      <h2 id="dlg-locations-title" data-i18n="locations">Locations</h2>
+      <button class="icon-btn" type="button" data-close data-i18n-attr="aria-label:close" aria-label="Close"></button>
+    </div>
+    <ul class="loc-list" id="loc-list"></ul>
+  </dialog>
+
+  <!-- Settings -->
+  <dialog id="dlg-settings" class="sheet" aria-labelledby="dlg-settings-title">
+    <div class="sheet-head">
+      <h2 id="dlg-settings-title" data-i18n="settings">Settings</h2>
+      <button class="icon-btn" type="button" data-close data-i18n-attr="aria-label:close" aria-label="Close"></button>
+    </div>
+    <form id="settings-form" class="settings">
+      <fieldset>
+        <legend data-i18n="units">Units</legend>
+        <label><span data-i18n="temperature">Temperature</span>
+          <select name="tempUnit"><option value="c">°C</option><option value="f">°F</option></select></label>
+        <label><span data-i18n="windSpeed">Wind speed</span>
+          <select name="windUnit"><option value="kmh">km/h</option><option value="mph">mph</option><option value="ms">m/s</option></select></label>
+        <label><span data-i18n="precipitation">Precipitation</span>
+          <select name="precipUnit"><option value="mm">mm</option><option value="in">in</option></select></label>
+        <label><span data-i18n="pressure">Pressure</span>
+          <select name="pressureUnit"><option value="hPa">hPa</option><option value="inHg">inHg</option></select></label>
+        <label><span data-i18n="timeFormat">Time format</span>
+          <select name="timeFormat"><option value="12" data-i18n="h12">12-hour</option><option value="24" data-i18n="h24">24-hour</option></select></label>
+      </fieldset>
+      <fieldset>
+        <legend data-i18n="appearance">Appearance</legend>
+        <label><span data-i18n="theme">Theme</span>
+          <select name="theme">
+            <option value="system" data-i18n="themeSystem">System</option>
+            <option value="light" data-i18n="themeLight">Light</option>
+            <option value="dark" data-i18n="themeDark">Dark</option>
+          </select></label>
+        <label><span data-i18n="language">Language</span>
+          <select name="lang" id="lang-select"></select></label>
+      </fieldset>
+      <fieldset>
+        <legend data-i18n="notifications">Notifications</legend>
+        <label class="check"><input type="checkbox" name="notifySevere"> <span data-i18n="notifySevere">Severe weather alerts</span></label>
+        <label class="check"><input type="checkbox" name="notifyRainSoon"> <span data-i18n="notifyRainSoon">Rain starting soon</span></label>
+        <label class="check"><input type="checkbox" name="notifyDaily"> <span data-i18n="notifyDaily">Daily forecast</span></label>
+        <label><span data-i18n="notifyTime">Time</span> <input type="time" name="dailyTime"></label>
+        <p class="hint" id="notify-hint" data-i18n="notifyNote"></p>
+      </fieldset>
+    </form>
+  </dialog>
+
+  <!-- Day details -->
+  <dialog id="dlg-day" class="sheet" aria-labelledby="dlg-day-title">
+    <div class="sheet-head">
+      <h2 id="dlg-day-title"></h2>
+      <button class="icon-btn" type="button" data-close data-i18n-attr="aria-label:close" aria-label="Close"></button>
+    </div>
+    <div class="day-summary" id="day-summary"></div>
+    <div class="chart-wrap" id="day-chart"></div>
+    <table class="day-table">
+      <caption class="visually-hidden" data-i18n="dayDetails">Hourly details</caption>
+      <tbody id="day-table"></tbody>
+    </table>
+  </dialog>
+
+  <!-- Location permission explainer -->
+  <dialog id="dlg-geo" class="sheet small" aria-labelledby="dlg-geo-title">
+    <h2 id="dlg-geo-title" data-i18n="geoTitle">Use your location?</h2>
+    <p data-i18n="geoBody"></p>
+    <div class="actions">
+      <button class="btn" type="button" value="no" data-geo="no" data-i18n="notNow">Not now</button>
+      <button class="btn btn-primary" type="button" value="yes" data-geo="yes" data-i18n="allow">Continue</button>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
