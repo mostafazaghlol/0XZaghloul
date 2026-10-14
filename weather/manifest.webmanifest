@@ -1,0 +1,13 @@
+{
+  "name": "Weather",
+  "short_name": "Weather",
+  "description": "Current conditions, forecasts, radar, air quality and alerts.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1b4f9c",
+  "theme_color": "#1b4f9c",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

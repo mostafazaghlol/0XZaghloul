@@ -1,0 +1,19 @@
+{
+  "name": "weather-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static weather web app (Open-Meteo) with offline cache, alerts, radar and PWA support.",
+  "type": "module",
+  "scripts": {
+    "start": "node server/server.mjs",
+    "test": "node --test \"tests/unit/*.test.mjs\"",
+    "test:e2e": "node --test --test-concurrency=1 \"tests/e2e/*.test.mjs\"",
+    "test:all": "npm test && npm run test:e2e"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
