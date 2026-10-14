@@ -371,6 +371,7 @@ main { padding-bottom: 24px; outline: none; }
 }
 .btn.small { min-height: 36px; padding: 6px 12px; }
 .btn-primary { background: var(--accent); color: var(--accent-contrast); border-color: transparent; }
+#btn-install::before { content: "· "; display: inline-block; margin-inline-end: 0.25em; text-decoration: none; }
 .link-btn { border: 0; background: none; padding: 0; color: inherit; text-decoration: underline; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 16px; }
 .danger { color: #e03131; }

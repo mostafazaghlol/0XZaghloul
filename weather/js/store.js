@@ -48,7 +48,18 @@ function remove(key) {
   memory.delete(key);
 }
 
-export function defaultSettings(locale = globalThis.navigator?.language || 'en-US') {
+/** Browser locale as a valid BCP 47 tag (some environments report e.g. "en-US@posix"). */
+function safeLocale(raw) {
+  try {
+    return Intl.getCanonicalLocales(raw)[0] || 'en-US';
+  } catch {
+    const cleaned = String(raw || '').split(/[@.]/)[0].replace('_', '-');
+    try { return Intl.getCanonicalLocales(cleaned)[0] || 'en-US'; } catch { return 'en-US'; }
+  }
+}
+
+export function defaultSettings(rawLocale = globalThis.navigator?.language || 'en-US') {
+  const locale = safeLocale(rawLocale);
   const lang = locale.split('-')[0];
   const uses12h = new Intl.DateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions().hour12 !== false;
   return {

@@ -127,3 +127,10 @@ test('store: corrupt JSON falls back to defaults', () => {
   localStorage.setItem('wx.favorites', '{not json');
   assert.deepEqual(store.loadFavorites(), []);
 });
+
+test('store: malformed browser locales do not crash defaults', () => {
+  assert.doesNotThrow(() => store.defaultSettings('en-US@posix'));
+  assert.equal(store.defaultSettings('en-US@posix').tempUnit, 'f');
+  assert.equal(store.defaultSettings('ar_EG.UTF-8').lang, 'ar');
+  assert.equal(store.defaultSettings('!!').lang, 'en');
+});
